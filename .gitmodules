@@ -1,6 +1,0 @@
-[submodule "dependencies/glfw"]
-	path = dependencies/glfw
-	url = https://github.com/glfw/glfw
-[submodule "dependencies/Vulkan-Headers"]
-	path = dependencies/Vulkan-Headers
-	url = https://github.com/KhronosGroup/Vulkan-Headers

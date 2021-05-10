@@ -133,7 +133,7 @@ namespace mc {
 
 namespace mc {
     constexpr const char* MC_APPLICATION_NAME    = "Minecraft - Client";
-    constexpr u32         MC_APPLICATION_VERSION = VK_MAKE_API_VERSION(1, 0, 0, 0);
+    constexpr u32         MC_APPLICATION_VERSION = VK_MAKE_VERSION(1, 0, 0, 0);
 
     constexpr const char* MC_ENGINE_NAME    = "F. Weiss <3";
     constexpr u32         MC_ENGINE_VERSION = MC_APPLICATION_VERSION;

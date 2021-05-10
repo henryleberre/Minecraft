@@ -276,7 +276,9 @@ namespace mc {
             s_.device.destroySwapchainKHR(s_.swapChain);
             s_.device.destroy();
             s_.instance.destroySurfaceKHR(s_.surface);
+#ifndef NDEBUG
             s_.instance.destroyDebugUtilsMessengerEXT(s_.debugUtilsMessenger, nullptr, s_.dynamicLoader);
+#endif
             s_.instance.destroy();
         }
     }; // class Renderer
