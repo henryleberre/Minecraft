@@ -7,19 +7,30 @@ namespace mc {
 
     class Minecraft {
     public:
-        Minecraft(int argc, char** argv) noexcept {
+        static void Startup(int argc, char** argv) {
             AppSurface::Acquire();
             Renderer::Startup();
         }
 
-        void Run() noexcept {
+        static void Update() noexcept {
+
+        }
+
+        static void Render() noexcept {
+            Renderer::Render();
+        }
+
+        static void Run() noexcept {
             while (AppSurface::Exists()) {
                 AppSurface::Update();
+                Minecraft::Update();
+                Minecraft::Render();
+
                 std::this_thread::yield();
             }
         }
 
-        ~Minecraft() {
+        static void Terminate() noexcept {
             AppSurface::Release();
             Renderer::Shutdown();
         }

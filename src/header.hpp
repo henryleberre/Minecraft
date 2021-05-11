@@ -79,11 +79,11 @@
 #   define VK_USE_PLATFORM_WIN32_KHR
 #endif // _WIN32
 
-#define VULKAN_HPP_NO_EXCEPTIONS
+//#define VULKAN_HPP_NO_EXCEPTIONS
 
 #include <vulkan/vulkan.hpp>
 
-#undef VULKAN_HPP_NO_EXCEPTIONS
+//#undef VULKAN_HPP_NO_EXCEPTIONS
 
 #ifdef _WIN32
 #   pragma comment(lib, "vulkan-1.lib")
@@ -148,7 +148,7 @@ namespace mc {
     };
 
     constexpr inline std::array MC_VULKAN_DEVICE_EXTENSIONS = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
 #ifdef NDEBUG
