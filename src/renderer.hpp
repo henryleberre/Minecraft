@@ -202,15 +202,15 @@ namespace mc {
             sci.preTransform = vk::SurfaceTransformFlagBitsKHR::eIdentity;
             sci.surface = s_.surface;
 
-            mc::u32 pQueueFamilyIndices[2] = {
+            std::array pQueueFamilyIndices = {
                 s_.physicalDevice.GetGraphicsQFData().indices.value().familyIndex,
                 s_.physicalDevice.GetPresentationQFData().indices.value().familyIndex
             };
 
-            if (s_.physicalDevice.GetGraphicsQFData().indices.value().familyIndex == s_.physicalDevice.GetPresentationQFData().indices.value().familyIndex) {
+            if (s_.physicalDevice.GetGraphicsQFData().indices.value().familyIndex != s_.physicalDevice.GetPresentationQFData().indices.value().familyIndex) {
                 sci.imageSharingMode      = vk::SharingMode::eConcurrent;
-                sci.pQueueFamilyIndices   = pQueueFamilyIndices;
-                sci.queueFamilyIndexCount = 2;
+                sci.pQueueFamilyIndices   = pQueueFamilyIndices.data();
+                sci.queueFamilyIndexCount = static_cast<u32>(pQueueFamilyIndices.size());
             } else {
                 sci.imageSharingMode      = vk::SharingMode::eExclusive;
                 sci.pQueueFamilyIndices   = nullptr;
@@ -423,8 +423,8 @@ namespace mc {
 
         static void CreateCommandPool() noexcept {
             vk::CommandPoolCreateInfo cpci{};
-            cpci.queueFamilyIndex = s_.physicalDevice.GetGraphicsQFData().indices.value().queueIndex;// .graphicsFamily.value();
-            cpci.flags = {}; // Optional
+            cpci.queueFamilyIndex = s_.physicalDevice.GetGraphicsQFData().indices.value().familyIndex;// .graphicsFamily.value();
+            cpci.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer; // Optional
 
             s_.commandPool = s_.device.createCommandPool(cpci);
         }
