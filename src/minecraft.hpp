@@ -2,6 +2,7 @@
 
 #include "appSurface.hpp"
 #include "renderer.hpp"
+#include "timer.hpp"
 
 namespace mc {
 
@@ -13,7 +14,7 @@ namespace mc {
         }
 
         static void Update() noexcept {
-
+            AppSurface::Update();
         }
 
         static void Render() noexcept {
@@ -22,7 +23,6 @@ namespace mc {
 
         static void Run() noexcept {
             while (AppSurface::Exists()) {
-                AppSurface::Update();
                 Minecraft::Update();
                 Minecraft::Render();
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "header.hpp"
+#include "vertex.hpp"
 #include "fileUtils.hpp"
 #include "physicalDeviceHelper.hpp"
 
@@ -43,6 +44,9 @@ namespace mc {
 
             vk::PipelineLayout pipelineLayout;
             vk::Pipeline pipeline;
+
+            vk::Buffer       vertexBuffer;
+            vk::DeviceMemory vertexBufferDeviceMemory;
 
             vk::CommandPool commandPool;
 
@@ -147,45 +151,12 @@ namespace mc {
             s_.physicalDevice.FetchQueues(s_.device);
         }
 
-        static void PickSwapChainSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& formats) noexcept {
-            for (const auto& format : formats) {
-                if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
-                {
-                    s_.swapChainSurfaceFormat = format;
-                    return;
-                }
-            }
-
-            s_.swapChainSurfaceFormat = formats[0];
-        }
-
-        static void PickSwapChainPresentMode(const std::vector<vk::PresentModeKHR>& modes) noexcept {
-            for (const auto& mode : modes) {
-                if (mode == vk::PresentModeKHR::eMailbox) {
-                    s_.swapChainPresentMode = mode;
-                    return;
-                }
-            }
-
-            s_.swapChainPresentMode = vk::PresentModeKHR::eFifo;
-        }
-
-        static void PickSwapChainExtent(const vk::SurfaceCapabilitiesKHR& capabilities) noexcept {
-            if (capabilities.currentExtent.width == UINT32_MAX) {
-                s_.swapChainExtent = capabilities.currentExtent;
-                return;
-            }
-
-            s_.swapChainExtent.width  = std::clamp(AppSurface::GetWidth(),  capabilities.minImageExtent.width,  capabilities.maxImageExtent.width);
-            s_.swapChainExtent.height = std::clamp(AppSurface::GetHeight(), capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-        }
-
         static void CreateSwapChain() noexcept {
             const auto surfaceCapabilities = s_.physicalDevice.GetPhysicalDevice().getSurfaceCapabilitiesKHR(s_.surface);
 
-            PickSwapChainSurfaceFormat(s_.physicalDevice.GetPhysicalDevice().getSurfaceFormatsKHR(s_.surface));
-            PickSwapChainPresentMode(s_.physicalDevice.GetPhysicalDevice().getSurfacePresentModesKHR(s_.surface));
-            PickSwapChainExtent(surfaceCapabilities);
+            s_.swapChainSurfaceFormat = mc::vk_utils::PickSwapChainSurfaceFormat(s_.physicalDevice.GetPhysicalDevice().getSurfaceFormatsKHR(s_.surface));
+            s_.swapChainPresentMode = mc::vk_utils::PickSwapChainPresentMode(s_.physicalDevice.GetPhysicalDevice().getSurfacePresentModesKHR(s_.surface));
+            s_.swapChainExtent = mc::vk_utils::PickSwapChainExtent(surfaceCapabilities);
 
             vk::SwapchainCreateInfoKHR sci{};
             sci.clipped = VK_TRUE;
@@ -313,11 +284,14 @@ namespace mc {
 
             std::array shaderStages = { vssci, fssci };
 
+            const auto bindingDescription    = mc::Vertex::GetBindingDescription();
+            const auto attributeDescriptions = mc::Vertex::GetAttributeDescriptions();
+
             vk::PipelineVertexInputStateCreateInfo pvisci{};
-            pvisci.vertexBindingDescriptionCount = 0;
-            pvisci.pVertexBindingDescriptions = nullptr; // Optional
-            pvisci.vertexAttributeDescriptionCount = 0;
-            pvisci.pVertexAttributeDescriptions = nullptr; // Optional
+            pvisci.vertexBindingDescriptionCount   = 1;
+            pvisci.pVertexBindingDescriptions      = &bindingDescription; // Optional
+            pvisci.vertexAttributeDescriptionCount = static_cast<u32>(attributeDescriptions.size());
+            pvisci.pVertexAttributeDescriptions    = attributeDescriptions.data(); // Optional
 
             vk::PipelineInputAssemblyStateCreateInfo piasci{};
             piasci.topology = vk::PrimitiveTopology::eTriangleList;// VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -421,6 +395,36 @@ namespace mc {
             s_.device.destroyShaderModule(fragShaderModule);
         }
 
+        static void CreateVertexBuffers() noexcept {
+            std::array vertices = {
+                Vertex{{0.0f, -0.5f}, {1.0f, 0.0f, 1.0f}},
+                Vertex{{0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}},
+                Vertex{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+            };
+
+            vk::BufferCreateInfo bci{};
+            bci.size  = sizeof(vertices);
+            bci.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+            bci.sharingMode = vk::SharingMode::eExclusive;
+
+            s_.vertexBuffer = s_.device.createBuffer(bci);
+
+            const auto bufferMemoryRequirements = s_.device.getBufferMemoryRequirements(s_.vertexBuffer);
+            const auto deviceMemoryProperties   = s_.physicalDevice.GetPhysicalDevice().getMemoryProperties();
+
+            vk::MemoryAllocateInfo allocationInfo{};
+            allocationInfo.allocationSize  = bufferMemoryRequirements.size;
+            allocationInfo.memoryTypeIndex = mc::vk_utils::FindMemoryType(deviceMemoryProperties, bufferMemoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+            
+            s_.vertexBufferDeviceMemory = s_.device.allocateMemory(allocationInfo);
+
+            s_.device.bindBufferMemory(s_.vertexBuffer, s_.vertexBufferDeviceMemory, 0);
+
+            void* mappedMemory = s_.device.mapMemory(s_.vertexBufferDeviceMemory, 0, VK_WHOLE_SIZE);
+            std::memcpy(mappedMemory, vertices.data(), sizeof(vertices));
+            s_.device.unmapMemory(s_.vertexBufferDeviceMemory);
+        }
+
         static void CreateCommandPool() noexcept {
             vk::CommandPoolCreateInfo cpci{};
             cpci.queueFamilyIndex = s_.physicalDevice.GetGraphicsQFData().indices.value().familyIndex;// .graphicsFamily.value();
@@ -455,22 +459,40 @@ namespace mc {
             CreateRenderPass();
             CreateSwapChainImagesViewsFrameBuffers();
             CreateGraphicsPipeline();
+            CreateVertexBuffers();
             CreateCommandPool();
             CreateCommandBuffers();
             CreateSemaphores();
         }
 
         static void Render() noexcept {
-            uint32_t imageIndex = s_.device.acquireNextImageKHR(s_.swapChain, UINT64_MAX, s_.imageAvailableSemaphore);
+            const u32 imgIdx = s_.device.acquireNextImageKHR(s_.swapChain, UINT64_MAX, s_.imageAvailableSemaphore);
+
+            //
+            //
+            // Fetch Useful Handles
+            //
+            //
+
+            const vk::CommandBuffer cmdBuff      = s_.commandBuffers[imgIdx];
+            const vk::Queue         gfxQueue     = s_.physicalDevice.GetGraphicsQFData().queue.value();
+            const vk::Queue         presentQueue = s_.physicalDevice.GetPresentationQFData().queue.value();
+            const vk::Framebuffer   frameBuffer  = s_.swapChainFrameBuffers[imgIdx];
+
+            //
+            // 
+            // Reccord Command Buffers
+            //
+            //
 
             vk::RenderPassBeginInfo renderPassInfo{};
             renderPassInfo.renderPass  = s_.renderPass;
-            renderPassInfo.framebuffer = s_.swapChainFrameBuffers[imageIndex];// swapChainFramebuffers[i];
+            renderPassInfo.framebuffer = frameBuffer;// swapChainFramebuffers[i];
             renderPassInfo.renderArea.offset = vk::Offset2D{ 0, 0 };
             renderPassInfo.renderArea.extent = s_.swapChainExtent;
 
             vk::ClearValue clearColor;
-            clearColor.color.setFloat32({ 0.0f, 0.0f, 0.0f, 1.0f });
+            clearColor.color.setFloat32({ 0.3f, 0.3f, 1.0f, 1.0f });
 
             renderPassInfo.clearValueCount = 1;
             renderPassInfo.pClearValues    = &clearColor;
@@ -479,12 +501,21 @@ namespace mc {
             beginInfo.flags = {}; // Optional
             beginInfo.pInheritanceInfo = nullptr; // Optional
 
-            s_.commandBuffers[imageIndex].begin(beginInfo);
-            s_.commandBuffers[imageIndex].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
-            s_.commandBuffers[imageIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, s_.pipeline);
-            s_.commandBuffers[imageIndex].draw(3, 1, 0, 0);
-            s_.commandBuffers[imageIndex].endRenderPass();
-            s_.commandBuffers[imageIndex].end();
+            cmdBuff.begin(beginInfo);
+            cmdBuff.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+            cmdBuff.bindPipeline(vk::PipelineBindPoint::eGraphics, s_.pipeline);
+            vk::DeviceSize offset = 0;
+            vkCmdBindVertexBuffers(cmdBuff, 0, 1, (VkBuffer*)&s_.vertexBuffer, &offset);
+            //cmdBuff.bindVertexBuffers(0, 1, &s_.vertexBuffer, &offset);
+            cmdBuff.draw(3, 1, 0, 0);
+            cmdBuff.endRenderPass();
+            cmdBuff.end();
+
+            // 
+            //
+            // Submit Command Buffers
+            //
+            //
 
             vk::SubmitInfo submitInfo{};
 
@@ -496,11 +527,17 @@ namespace mc {
             submitInfo.pWaitSemaphores      = waitSemaphores.data();
             submitInfo.pWaitDstStageMask    = waitStages.data();
             submitInfo.commandBufferCount   = 1;
-            submitInfo.pCommandBuffers      = &s_.commandBuffers[imageIndex];
+            submitInfo.pCommandBuffers      = &cmdBuff;
             submitInfo.signalSemaphoreCount = static_cast<u32>(signalSemaphores.size());
             submitInfo.pSignalSemaphores    = signalSemaphores.data();
 
-            s_.physicalDevice.GetPresentationQFData().queue.value().submit(submitInfo);
+            gfxQueue.submit(submitInfo);
+
+            //
+            //
+            // Present Frames 
+            //
+            //
 
             vk::PresentInfoKHR presentInfo{};
             presentInfo.waitSemaphoreCount = static_cast<u32>(signalSemaphores.size());
@@ -509,11 +546,13 @@ namespace mc {
             std::array swapChains = { s_.swapChain };
             presentInfo.swapchainCount = 1;
             presentInfo.pSwapchains    = swapChains.data();
-            presentInfo.pImageIndices  = &imageIndex;
-            presentInfo.pResults = nullptr; // Optional
+            presentInfo.pImageIndices  = &imgIdx;
+            presentInfo.pResults       = nullptr; // Optional
 
-            s_.physicalDevice.GetPresentationQFData().queue.value().presentKHR(presentInfo);
-            s_.physicalDevice.GetPresentationQFData().queue.value().waitIdle();
+            presentQueue.presentKHR(presentInfo);
+
+            //TODO: Upgrade to frames in flight
+            presentQueue.waitIdle();
         }
 
         static void Shutdown() noexcept {
@@ -521,6 +560,9 @@ namespace mc {
             s_.device.destroySemaphore(s_.renderFinishedSemaphore);
 
             s_.device.destroyCommandPool(s_.commandPool);
+
+            s_.device.destroyBuffer(s_.vertexBuffer);
+            s_.device.freeMemory(s_.vertexBufferDeviceMemory);
 
             s_.device.destroyPipeline(s_.pipeline);
             s_.device.destroyPipelineLayout(s_.pipelineLayout);

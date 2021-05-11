@@ -80,7 +80,7 @@ namespace mc {
             const auto instanceLayerProperties = this->physicalDevice.enumerateDeviceExtensionProperties();
 
             for (const char* const requiredDeviceExt : mc::MC_VULKAN_DEVICE_EXTENSIONS) {
-                if (!mc::details::IsExtensionPresent(requiredDeviceExt, instanceLayerProperties)) {
+                if (!mc::vk_utils::IsExtensionPresent(requiredDeviceExt, instanceLayerProperties)) {
                     this->bExtensionsSupported = false;
                     break;
                 }
@@ -156,6 +156,6 @@ namespace mc {
         inline operator vk::PhysicalDevice() const noexcept { return this->physicalDevice; }
 
         inline vk::PhysicalDevice& operator->() noexcept { return this->physicalDevice; }
-    }; // struct PhysicalDeviceWrapper
+    }; // struct PhysicalDeviceHelper
 
 }; // namespace mc

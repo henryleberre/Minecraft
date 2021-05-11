@@ -4,7 +4,7 @@
 
 namespace mc {
 
-    static std::optional<std::vector<char>> ReadBinaryFileToBuffer(const std::string& filename) {
+    std::optional<std::vector<char>> ReadBinaryFileToBuffer(const std::string& filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
         if (!file.is_open())

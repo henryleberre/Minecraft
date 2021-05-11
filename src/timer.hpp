@@ -7,6 +7,7 @@
  */
 
 namespace mc {
+
     class Timer {
     private:
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start;
@@ -22,4 +23,5 @@ namespace mc {
             return std::chrono::duration_cast<std::chrono::milliseconds>(end - m_start).count();
         }
     }; // class Timer
+
 }; // namespace mc
