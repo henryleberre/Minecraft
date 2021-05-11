@@ -67,8 +67,8 @@ namespace mc {
             instanceCI.enabledExtensionCount   = static_cast<u32>(MC_VULKAN_INSTANCE_EXTENSIONS.size());
             instanceCI.ppEnabledExtensionNames = MC_VULKAN_INSTANCE_EXTENSIONS.data();
 
-            instanceCI.enabledLayerCount   = 0;
-            instanceCI.ppEnabledLayerNames = nullptr;
+            instanceCI.enabledLayerCount   = static_cast<u32>(MC_VULKAN_LAYERS.size());
+            instanceCI.ppEnabledLayerNames = MC_VULKAN_LAYERS.data();
 
             instanceCI.flags = {};
             instanceCI.pApplicationInfo = &appInfo;
