@@ -3,6 +3,7 @@
 #include "header.hpp"
 #include "vertex.hpp"
 #include "fileUtils.hpp"
+#include "vertexBuffer.hpp"
 #include "physicalDeviceSupport.hpp"
 
 namespace mc {
@@ -50,8 +51,7 @@ namespace mc {
             vk::PipelineLayout pipelineLayout;
             vk::Pipeline pipeline;
 
-            vk::Buffer       vertexBuffer;
-            vk::DeviceMemory vertexBufferDeviceMemory;
+            mc::VertexBuffer vertexBuffer;
 
             vk::CommandPool commandPool;
 
@@ -374,27 +374,9 @@ namespace mc {
                 Vertex{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
             };
 
-            vk::BufferCreateInfo bci{};
-            bci.size  = sizeof(vertices);
-            bci.usage = vk::BufferUsageFlagBits::eVertexBuffer;
-            bci.sharingMode = vk::SharingMode::eExclusive;
-
-            s_.vertexBuffer = s_.device.createBuffer(bci);
-
-            const auto bufferMemoryRequirements = s_.device.getBufferMemoryRequirements(s_.vertexBuffer);
-            const auto deviceMemoryProperties   = s_.physicalSupport.GetMemoryProperties();
-
-            vk::MemoryAllocateInfo allocationInfo{};
-            allocationInfo.allocationSize  = bufferMemoryRequirements.size;
-            allocationInfo.memoryTypeIndex = mc::vk_utils::FindMemoryType(deviceMemoryProperties, bufferMemoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-            
-            s_.vertexBufferDeviceMemory = s_.device.allocateMemory(allocationInfo);
-
-            s_.device.bindBufferMemory(s_.vertexBuffer, s_.vertexBufferDeviceMemory, 0);
-
-            void* mappedMemory = s_.device.mapMemory(s_.vertexBufferDeviceMemory, 0, VK_WHOLE_SIZE);
-            std::memcpy(mappedMemory, vertices.data(), sizeof(vertices));
-            s_.device.unmapMemory(s_.vertexBufferDeviceMemory);
+            s_.vertexBuffer = mc::VertexBuffer(s_.device, s_.physicalSupport.GetMemoryProperties(), sizeof(vertices));
+            std::memcpy(s_.vertexBuffer.GetData(), vertices.data(), sizeof(vertices));
+            s_.vertexBuffer.Upload();
         }
 
         static void CreateCommandPool() {
@@ -481,8 +463,7 @@ namespace mc {
             cmdBuff.begin(beginInfo);
             cmdBuff.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             cmdBuff.bindPipeline(vk::PipelineBindPoint::eGraphics, s_.pipeline);
-            vk::DeviceSize offset = 0;
-            cmdBuff.bindVertexBuffers(0, 1, &s_.vertexBuffer, &offset);
+            s_.vertexBuffer.Bind(cmdBuff);
             cmdBuff.draw(3, 1, 0, 0);
             cmdBuff.endRenderPass();
             cmdBuff.end();
@@ -535,8 +516,7 @@ namespace mc {
 
             s_.device.destroyCommandPool(s_.commandPool);
 
-            s_.device.destroyBuffer(s_.vertexBuffer);
-            s_.device.freeMemory(s_.vertexBufferDeviceMemory);
+            s_.vertexBuffer.~VertexBuffer();
 
             s_.device.destroyPipeline(s_.pipeline);
             s_.device.destroyPipelineLayout(s_.pipelineLayout);
