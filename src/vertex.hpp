@@ -9,7 +9,7 @@ namespace mc {
         vec3f32 position;
         vec3f32 color;
 
-        static inline vk::VertexInputBindingDescription GetBindingDescription() noexcept {
+        static inline vk::VertexInputBindingDescription GetBindingDescription() {
             vk::VertexInputBindingDescription bindingDescription{};
             bindingDescription.binding   = 0;
             bindingDescription.inputRate = vk::VertexInputRate::eVertex;
@@ -18,7 +18,7 @@ namespace mc {
             return bindingDescription;
         }
 
-        static inline auto GetAttributeDescriptions() noexcept {
+        static inline auto GetAttributeDescriptions() {
             std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions{};
 
             attributeDescriptions[0].binding  = 0;

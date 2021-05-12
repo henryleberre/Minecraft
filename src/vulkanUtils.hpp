@@ -6,7 +6,7 @@ namespace mc {
 
     namespace vk_utils {
 
-        bool IsExtensionPresent(const char* extName, const std::vector<vk::ExtensionProperties>& extPropss) noexcept {
+        bool IsExtensionPresent(const char* extName, const std::vector<vk::ExtensionProperties>& extPropss) {
             for (const vk::ExtensionProperties& extProps : extPropss) {
                 if (!std::strcmp(extName, extProps.extensionName))
                     return true;
@@ -15,7 +15,7 @@ namespace mc {
             return false;
         }
 
-        bool IsLayerPresent(const char* lyrName, const std::vector<vk::LayerProperties>& lyrPropss) noexcept {
+        bool IsLayerPresent(const char* lyrName, const std::vector<vk::LayerProperties>& lyrPropss) {
             for (const vk::LayerProperties& lyrProps : lyrPropss) {
                 if (!std::strcmp(lyrName, lyrProps.layerName))
                     return true;
@@ -24,7 +24,7 @@ namespace mc {
             return false;
         }
 
-        vk::SurfaceFormatKHR PickSwapChainSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& formats) noexcept {
+        vk::SurfaceFormatKHR PickSwapChainSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& formats) {
             for (const auto& format : formats)
                 if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
                     return format;
@@ -32,7 +32,7 @@ namespace mc {
             return formats[0];
         }
 
-        vk::PresentModeKHR PickSwapChainPresentMode(const std::vector<vk::PresentModeKHR>& modes) noexcept {
+        vk::PresentModeKHR PickSwapChainPresentMode(const std::vector<vk::PresentModeKHR>& modes) {
             for (const auto& mode : modes)
                 if (mode == vk::PresentModeKHR::eMailbox)
                     return mode;
@@ -40,7 +40,7 @@ namespace mc {
             return vk::PresentModeKHR::eFifo;
         }
 
-        vk::Extent2D PickSwapChainExtent(const vk::SurfaceCapabilitiesKHR& capabilities) noexcept {
+        vk::Extent2D PickSwapChainExtent(const vk::SurfaceCapabilitiesKHR& capabilities) {
             if (capabilities.currentExtent.width == UINT32_MAX)
                 return capabilities.currentExtent;
 
@@ -50,7 +50,7 @@ namespace mc {
             };
         }
 
-        mc::u32 FindMemoryType(const vk::PhysicalDeviceMemoryProperties& deviceMemoryProperties, const mc::u32 typeFilter, const vk::MemoryPropertyFlags properties) noexcept {
+        mc::u32 FindMemoryType(const vk::PhysicalDeviceMemoryProperties& deviceMemoryProperties, const mc::u32 typeFilter, const vk::MemoryPropertyFlags properties) {
             for (mc::u32 i = 0; i < deviceMemoryProperties.memoryTypeCount; i++)
                 if ((typeFilter & (1 << i)) && (deviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
                     return i;

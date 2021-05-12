@@ -3,14 +3,15 @@
 #include "header.hpp"
 #include "vertex.hpp"
 #include "fileUtils.hpp"
-#include "physicalDeviceHelper.hpp"
+#include "physicalDeviceSupport.hpp"
 
 namespace mc {
 
     namespace details {
 #ifndef NDEBUG
         static VKAPI_ATTR VkBool32 VKAPI_CALL RendererVulkanValidationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
-            std::cout << pCallbackData->pMessage << '\n';
+            if ((vk::DebugUtilsMessageSeverityFlagsEXT)messageSeverity > vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning)
+                std::cout << pCallbackData->pMessage << '\n';
 
             return VK_FALSE;
         }
@@ -28,8 +29,12 @@ namespace mc {
 #endif
 
             vk::SurfaceKHR surface;
-            mc::PhysicalDeviceHelper physicalDevice;
+
+            vk::PhysicalDevice physical;
+            mc::vk_utils::PhysicalDeviceSupport physicalSupport;
+
             vk::Device device;
+
             vk::SwapchainKHR swapChain;
 
             vk::SurfaceFormatKHR swapChainSurfaceFormat;
@@ -59,7 +64,7 @@ namespace mc {
         } static s_;
 
     private:
-        static void CreateInstance() noexcept {
+        static void CreateInstance() {
             vk::ApplicationInfo appInfo{};
             appInfo.apiVersion = MC_VULKAN_VERSION;
             appInfo.applicationVersion = MC_APPLICATION_VERSION;
@@ -91,41 +96,8 @@ namespace mc {
 #endif // NDEBUG
         }
 
-        static void CreateSurface() noexcept {
-#ifdef _WIN32
-            vk::Win32SurfaceCreateInfoKHR win32SurfaceCIkhr{};
-            win32SurfaceCIkhr.flags     = {};
-            win32SurfaceCIkhr.hinstance = GetModuleHandleA(NULL);
-            win32SurfaceCIkhr.hwnd      = AppSurface::GetNativeHandle();
-
-            s_.surface = s_.instance.createWin32SurfaceKHR(win32SurfaceCIkhr);
-#endif // _WIN32
-        }
-
-        static void PickPhysicalDevice() noexcept {
-            const std::vector<vk::PhysicalDevice> physicalDevices = s_.instance.enumeratePhysicalDevices();
-
-            std::vector<PhysicalDeviceHelper> physicalDeviceWrappers;
-            physicalDeviceWrappers.reserve(physicalDevices.size());
-            for (const vk::PhysicalDevice& physicalDevice : physicalDevices) {
-                PhysicalDeviceHelper physicalDeviceWrapper(physicalDevice, s_.surface);
-
-                if (physicalDeviceWrapper.IsSuitable())
-                    physicalDeviceWrappers.push_back(physicalDeviceWrapper);
-            }
-
-            PhysicalDeviceHelper* pBest = physicalDeviceWrappers.data();
-            for (PhysicalDeviceHelper* pCurrent = pBest; pCurrent < physicalDeviceWrappers.data() + physicalDeviceWrappers.size(); ++pCurrent)
-                if (pCurrent->GetScore() > pBest->GetScore())
-                    pBest = pCurrent;
-
-            s_.physicalDevice = *pBest;
-
-            std::cout << "[RENDERER] - Selected \"" << pBest->GetPhysicalDevice().getProperties().deviceName << "\" for rendering \n";
-        }
-
-        static void CreateLogicalDeviceAndFetchQueues() noexcept {
-            const std::vector<vk::DeviceQueueCreateInfo> dqcis = s_.physicalDevice.GenerateDeviceQueueCreateInfos();
+        static void CreateLogicalDeviceAndFetchQueues() {
+            const std::vector<vk::DeviceQueueCreateInfo> dqcis = s_.physicalSupport.GenerateDeviceQueueCreateInfos();
 
             vk::PhysicalDeviceFeatures enabledDeviceFeatures{};
 
@@ -142,20 +114,20 @@ namespace mc {
             deviceCI.flags = {};
             deviceCI.pEnabledFeatures = &enabledDeviceFeatures;
 
-            s_.device = s_.physicalDevice.GetPhysicalDevice().createDevice(deviceCI);
+            s_.device = s_.physical.createDevice(deviceCI);
 
 #ifndef NDEBUG
             s_.dynamicLoader.init(s_.device);
 #endif
 
-            s_.physicalDevice.FetchQueues(s_.device);
+            s_.physicalSupport.FetchQueues(s_.device);
         }
 
-        static void CreateSwapChain() noexcept {
-            const auto surfaceCapabilities = s_.physicalDevice.GetPhysicalDevice().getSurfaceCapabilitiesKHR(s_.surface);
+        static void CreateSwapChain() {
+            const auto surfaceCapabilities = s_.physical.getSurfaceCapabilitiesKHR(s_.surface);
 
-            s_.swapChainSurfaceFormat = mc::vk_utils::PickSwapChainSurfaceFormat(s_.physicalDevice.GetPhysicalDevice().getSurfaceFormatsKHR(s_.surface));
-            s_.swapChainPresentMode = mc::vk_utils::PickSwapChainPresentMode(s_.physicalDevice.GetPhysicalDevice().getSurfacePresentModesKHR(s_.surface));
+            s_.swapChainSurfaceFormat = mc::vk_utils::PickSwapChainSurfaceFormat(s_.physical.getSurfaceFormatsKHR(s_.surface));
+            s_.swapChainPresentMode = mc::vk_utils::PickSwapChainPresentMode(s_.physical.getSurfacePresentModesKHR(s_.surface));
             s_.swapChainExtent = mc::vk_utils::PickSwapChainExtent(surfaceCapabilities);
 
             vk::SwapchainCreateInfoKHR sci{};
@@ -174,11 +146,11 @@ namespace mc {
             sci.surface = s_.surface;
 
             std::array pQueueFamilyIndices = {
-                s_.physicalDevice.GetGraphicsQFData().indices.value().familyIndex,
-                s_.physicalDevice.GetPresentationQFData().indices.value().familyIndex
+                s_.physicalSupport.GetGraphicsQFData().indices.value().familyIndex,
+                s_.physicalSupport.GetPresentationQFData().indices.value().familyIndex
             };
 
-            if (s_.physicalDevice.GetGraphicsQFData().indices.value().familyIndex != s_.physicalDevice.GetPresentationQFData().indices.value().familyIndex) {
+            if (s_.physicalSupport.GetGraphicsQFData().indices.value().familyIndex != s_.physicalSupport.GetPresentationQFData().indices.value().familyIndex) {
                 sci.imageSharingMode      = vk::SharingMode::eConcurrent;
                 sci.pQueueFamilyIndices   = pQueueFamilyIndices.data();
                 sci.queueFamilyIndexCount = static_cast<u32>(pQueueFamilyIndices.size());
@@ -191,7 +163,7 @@ namespace mc {
             s_.swapChain = s_.device.createSwapchainKHR(sci);
         }
 
-        static void CreateRenderPass() noexcept {
+        static void CreateRenderPass() {
             vk::AttachmentDescription colorAttachment{};
             colorAttachment.format = s_.swapChainSurfaceFormat.format;// swapChainImageFormat;
             colorAttachment.samples = vk::SampleCountFlagBits::e1;// VK_SAMPLE_COUNT_1_BIT;
@@ -220,7 +192,7 @@ namespace mc {
             s_.renderPass = s_.device.createRenderPass(rpci);
         }
 
-        static void CreateSwapChainImagesViewsFrameBuffers() noexcept {
+        static void CreateSwapChainImagesViewsFrameBuffers() {
             s_.swapChainImages = s_.device.getSwapchainImagesKHR(s_.swapChain);
             s_.swapChainImageCount = s_.swapChainImages.size();
 
@@ -260,7 +232,7 @@ namespace mc {
             }
         }
 
-        static void CreateGraphicsPipeline() noexcept {
+        static void CreateGraphicsPipeline() {
             auto CreateShaderModule = [](const vk::Device& device, const std::vector<char>& byteCode) -> vk::ShaderModule {
                 vk::ShaderModuleCreateInfo smci{};
                 smci.codeSize = byteCode.size();
@@ -395,7 +367,7 @@ namespace mc {
             s_.device.destroyShaderModule(fragShaderModule);
         }
 
-        static void CreateVertexBuffers() noexcept {
+        static void CreateVertexBuffers() {
             std::array vertices = {
                 Vertex{{0.0f, -0.5f}, {1.0f, 0.0f, 1.0f}},
                 Vertex{{0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}},
@@ -410,7 +382,7 @@ namespace mc {
             s_.vertexBuffer = s_.device.createBuffer(bci);
 
             const auto bufferMemoryRequirements = s_.device.getBufferMemoryRequirements(s_.vertexBuffer);
-            const auto deviceMemoryProperties   = s_.physicalDevice.GetPhysicalDevice().getMemoryProperties();
+            const auto deviceMemoryProperties   = s_.physicalSupport.GetMemoryProperties();
 
             vk::MemoryAllocateInfo allocationInfo{};
             allocationInfo.allocationSize  = bufferMemoryRequirements.size;
@@ -425,15 +397,15 @@ namespace mc {
             s_.device.unmapMemory(s_.vertexBufferDeviceMemory);
         }
 
-        static void CreateCommandPool() noexcept {
+        static void CreateCommandPool() {
             vk::CommandPoolCreateInfo cpci{};
-            cpci.queueFamilyIndex = s_.physicalDevice.GetGraphicsQFData().indices.value().familyIndex;// .graphicsFamily.value();
+            cpci.queueFamilyIndex = s_.physicalSupport.GetGraphicsQFData().indices.value().familyIndex;// .graphicsFamily.value();
             cpci.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer; // Optional
 
             s_.commandPool = s_.device.createCommandPool(cpci);
         }
 
-        static void CreateCommandBuffers() noexcept {
+        static void CreateCommandBuffers() {
             vk::CommandBufferAllocateInfo cbai{};
             cbai.commandPool = s_.commandPool;
             cbai.level = vk::CommandBufferLevel::ePrimary;// VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -442,7 +414,7 @@ namespace mc {
             s_.commandBuffers = s_.device.allocateCommandBuffers(cbai);
         }
 
-        static void CreateSemaphores() noexcept {
+        static void CreateSemaphores() {
             vk::SemaphoreCreateInfo sci{};
 
             s_.imageAvailableSemaphore = s_.device.createSemaphore(sci);
@@ -450,10 +422,15 @@ namespace mc {
         }
 
     public:
-        static void Startup() noexcept {
+        static void Startup() {
             CreateInstance();
-            CreateSurface();
-            PickPhysicalDevice();
+            
+            s_.surface = mc::AppSurface::CreateVulkanSurface(s_.instance);
+            
+            s_.physicalSupport = mc::vk_utils::PickPhysicalDevice(s_.instance, s_.surface);
+            s_.physical        = s_.physicalSupport.GetPhysical();
+            std::cout << "[RENDERER] Selected " << s_.physicalSupport.GetProperties().deviceName << " for rendering\n" << std::flush;
+
             CreateLogicalDeviceAndFetchQueues();
             CreateSwapChain();
             CreateRenderPass();
@@ -465,7 +442,7 @@ namespace mc {
             CreateSemaphores();
         }
 
-        static void Render() noexcept {
+        static void Render() {
             const u32 imgIdx = s_.device.acquireNextImageKHR(s_.swapChain, UINT64_MAX, s_.imageAvailableSemaphore);
 
             //
@@ -475,8 +452,8 @@ namespace mc {
             //
 
             const vk::CommandBuffer cmdBuff      = s_.commandBuffers[imgIdx];
-            const vk::Queue         gfxQueue     = s_.physicalDevice.GetGraphicsQFData().queue.value();
-            const vk::Queue         presentQueue = s_.physicalDevice.GetPresentationQFData().queue.value();
+            const vk::Queue         gfxQueue     = s_.physicalSupport.GetGraphicsQFData().queue.value();
+            const vk::Queue         presentQueue = s_.physicalSupport.GetPresentationQFData().queue.value();
             const vk::Framebuffer   frameBuffer  = s_.swapChainFrameBuffers[imgIdx];
 
             //
@@ -505,8 +482,7 @@ namespace mc {
             cmdBuff.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             cmdBuff.bindPipeline(vk::PipelineBindPoint::eGraphics, s_.pipeline);
             vk::DeviceSize offset = 0;
-            vkCmdBindVertexBuffers(cmdBuff, 0, 1, (VkBuffer*)&s_.vertexBuffer, &offset);
-            //cmdBuff.bindVertexBuffers(0, 1, &s_.vertexBuffer, &offset);
+            cmdBuff.bindVertexBuffers(0, 1, &s_.vertexBuffer, &offset);
             cmdBuff.draw(3, 1, 0, 0);
             cmdBuff.endRenderPass();
             cmdBuff.end();
@@ -542,12 +518,10 @@ namespace mc {
             vk::PresentInfoKHR presentInfo{};
             presentInfo.waitSemaphoreCount = static_cast<u32>(signalSemaphores.size());
             presentInfo.pWaitSemaphores    = signalSemaphores.data();
-
-            std::array swapChains = { s_.swapChain };
-            presentInfo.swapchainCount = 1;
-            presentInfo.pSwapchains    = swapChains.data();
-            presentInfo.pImageIndices  = &imgIdx;
-            presentInfo.pResults       = nullptr; // Optional
+            presentInfo.swapchainCount     = 1;
+            presentInfo.pSwapchains        = &s_.swapChain;
+            presentInfo.pImageIndices      = &imgIdx;
+            presentInfo.pResults           = nullptr; // Optional
 
             presentQueue.presentKHR(presentInfo);
 
@@ -555,7 +529,7 @@ namespace mc {
             presentQueue.waitIdle();
         }
 
-        static void Shutdown() noexcept {
+        static void Shutdown() {
             s_.device.destroySemaphore(s_.imageAvailableSemaphore);
             s_.device.destroySemaphore(s_.renderFinishedSemaphore);
 

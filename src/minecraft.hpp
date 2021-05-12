@@ -13,15 +13,15 @@ namespace mc {
             Renderer::Startup();
         }
 
-        static void Update() noexcept {
+        static void Update() {
             AppSurface::Update();
         }
 
-        static void Render() noexcept {
+        static void Render() {
             Renderer::Render();
         }
 
-        static void Run() noexcept {
+        static void Run() {
             while (AppSurface::Exists()) {
                 Minecraft::Update();
                 Minecraft::Render();
@@ -30,7 +30,7 @@ namespace mc {
             }
         }
 
-        static void Terminate() noexcept {
+        static void Terminate() {
             AppSurface::Release();
             Renderer::Shutdown();
         }

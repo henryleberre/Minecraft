@@ -14,7 +14,7 @@ namespace mc {
 
     private:
 #ifdef _WIN32
-        static LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) noexcept {
+        static LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (hwnd == mc::AppSurface::s_.handle) {
                 switch (msg) {
                 case WM_DESTROY:
@@ -32,7 +32,7 @@ namespace mc {
 #endif // _WIN32
 
     public:
-        static void Acquire() noexcept {
+        static void Acquire() {
 #ifdef _WIN32
             WNDCLASSA wc     = { };
             wc.lpfnWndProc   = mc::AppSurface::Win32WindowProc;
@@ -48,20 +48,20 @@ namespace mc {
         }
 
 #ifdef _WIN32
-        static inline bool Exists() noexcept { return s_.handle != NULL; }
-        static inline void Show()   noexcept { ShowWindow(s_.handle, SW_SHOW); }
-        static inline void Hide()   noexcept { ShowWindow(s_.handle, SW_HIDE); }
-        static inline void Free()   noexcept { DestroyWindow(s_.handle); s_.handle = NULL; }
+        static inline bool Exists() { return s_.handle != NULL; }
+        static inline void Show()   { ShowWindow(s_.handle, SW_SHOW); }
+        static inline void Hide()   { ShowWindow(s_.handle, SW_HIDE); }
+        static inline void Free()   { DestroyWindow(s_.handle); s_.handle = NULL; }
 #endif // _WIN32
 
-        static inline u32 GetWidth()  noexcept { return s_.width; }
-        static inline u32 GetHeight() noexcept { return s_.height; }
+        static inline u32 GetWidth()  { return s_.width; }
+        static inline u32 GetHeight() { return s_.height; }
 
 #ifdef _WIN32
-        static inline HWND GetNativeHandle() noexcept { return s_.handle; }
+        static inline HWND GetNativeHandle() { return s_.handle; }
 #endif // _WIN32
 
-        static void Update() noexcept {
+        static void Update() {
 #ifdef _WIN32
             MSG msg = { };
             while (PeekMessageA(&msg, s_.handle, 0, 0, PM_REMOVE) > 0) {
@@ -71,7 +71,18 @@ namespace mc {
 #endif // _WIN32
         }
 
-        static void Release() noexcept {
+        static vk::SurfaceKHR CreateVulkanSurface(const vk::Instance& instance) {
+#ifdef _WIN32
+            vk::Win32SurfaceCreateInfoKHR win32SurfaceCIkhr{};
+            win32SurfaceCIkhr.flags     = {};
+            win32SurfaceCIkhr.hinstance = GetModuleHandleA(NULL);
+            win32SurfaceCIkhr.hwnd      = s_.handle;
+
+            return instance.createWin32SurfaceKHR(win32SurfaceCIkhr);
+#endif // _WIN32
+        }
+
+        static void Release() {
             DestroyWindow(s_.handle);
             s_.handle = NULL;
 
